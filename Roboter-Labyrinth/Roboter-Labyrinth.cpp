@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <thread>
 using namespace std;
 
 
@@ -38,9 +39,7 @@ struct feld {
 	bool bot_used{ false };
 	bool left_used{ false };
 	bool hash_tag{ false };
-	bool used() {
-		return top_used && right_used && top_used && right_used;
-	}
+	bool used{ false };
 
 };
 
@@ -59,44 +58,44 @@ struct Maze {
 			}
 			data.push_back(temp);
 		}
-		print();
 	}
 	void print() {
 		for (const auto& elem : data) {
 			for (const auto& elem2 : elem) {
 				if (elem2->hash_tag)cout << '#';
+				else if (elem2->used)cout << ".";
 				else cout << ' ';
 			}
-			cout << '\n';
+			cout << endl;
 		}
 	}
-	feld get(size_t x, size_t y) {
-		if (x > max_row)cout << "Error x";
-		if (y > max_coll)cout << "Error y";
-		return *(data.at(y).at(x));
+	shared_ptr<feld> get(size_t x, size_t y) {		//gibt feld zurück von dem die cords eingelesen werden
+		return (data.at(y).at(x));
 	}
 };
 
 
-class roboter  {
+class roboter  {			//erstellen  abstrakte klasse für unter roboter
 public://varibalen public ==== illegal
 	size_t steps{ 0 };
-	vector<string> maze;
-	shared_ptr<Maze>maze2;
-	size_t max_row, max_coll {0};
-
-	roboter();
-	void constructor(vector<string> maze_in) {
+	vector<string> maze;		//anfangs und Endpunktfinden nötige MAZE
+	shared_ptr<Maze>maze2;		//Maze mit dem gearbeitet wird speichern und bearbeiten
+	size_t max_row, max_coll {0};		
+	roboter() {};				//default
+	void constructor(vector<string> maze_in) {			//liest maze ein, erstellt, maxrow maxcol init, start function moving
 		maze = maze_in;
 		maze2 = shared_ptr<Maze>(new Maze(maze_in));
 		max_row = maze.size() - 1;
 		max_coll = maze.at(0).size() - 1;
 		start_moving(find(true), find(false));
-		cout << steps;
 	}
-	roboter(vector<string> maze_in) {
+	roboter(vector<string> maze_in) {			//constructor 
 		constructor(maze_in);
 	}
+	void print() {				//steps funcition zeichnet maze
+		maze2->print();
+		cout << steps << "\n";
+	};
 	pair<size_t, size_t> find(bool start) {//wenn start true wird das erste returned
 		bool flag = start;//flag wird auf true gesetzt wenn die nächste freie Stelle returend werden muss
 		for (size_t i = 0; i<maze.at(0).size(); ++i) {//erste Zeile von links nach rechts
@@ -131,86 +130,96 @@ public://varibalen public ==== illegal
 	void start_moving(pair<size_t, size_t> start, pair<size_t, size_t> end) {//rechtsseitig
 		size_t x = start.first;
 		size_t y = start.second;
-		feld startLoc(start.second, start.first, false);
 		feld endLoc(end.second, end.first, false);
-		cout<< move(&startLoc, endLoc, shared_ptr<used>(new used()));
+		//move(maze2->get(y, x), maze2->get(end.second, end.first), shared_ptr<used>(new used()));
 	}
-
-	virtual bool move(feld* loc, feld end, shared_ptr<used>before);
+	virtual bool move(shared_ptr<feld> loc, shared_ptr<feld> end, shared_ptr<used>before) { return false; };
 };
 
 class homobot :public roboter{
-	bool move(feld* loc, feld end, shared_ptr<used>before) {//location
+public:
+	homobot():roboter() {};
+	bool move(shared_ptr<feld> loc, shared_ptr<feld> end, shared_ptr<used>before) {//location
 		shared_ptr<used> temp_used = shared_ptr<used>(new used());
-		if ((loc->x == end.x && loc->y == end.y))return true;
-		if (loc->hash_tag)return false;
+		if ((loc->x == end->x && loc->y == end->y)) {
+			++steps;
+			loc->used = true;
+			return true;
+		}													//bewegung , schaut ob frei , markiert wenn besucht,zählt die steps hoch
+		if (loc->hash_tag)return false;						//beendet durch ende finden																
 		++steps;
-		if (!loc->right_used && !(before->left_used) && (loc->x + 1) <= max_coll) {
-			loc->right_used = true;
-			temp_used->right_used = true;
-			if (move(&(maze2->get(loc->x + 1, loc->y)), end, temp_used))return true;
-			temp_used->reset();
-		}
-
-		if (!loc->bot_used && !(before->top_used) && (loc->y + 1) <= max_row) {
-			loc->bot_used = true;
-			temp_used->bot_used = true;
-			if (move(&(maze2->get(loc->x, loc->y + 1)), end, temp_used))return true;
-			temp_used->reset();
-		}
+		loc->used = true;
 
 		if (!loc->left_used && !(before->right_used) && (loc->x - 1) <= max_coll) {
 			loc->left_used = true;
 			temp_used->left_used = true;
-			if (move(&(maze2->get(loc->x - 1, loc->y)), end, temp_used))return true;
+			if (move((maze2->get(loc->x - 1, loc->y)), end, temp_used))return true;
+			temp_used->reset();
+		}
+
+		if (!loc->right_used && !(before->left_used) && (loc->x + 1) <= max_coll) {
+			loc->right_used = true;
+			temp_used->right_used = true;
+			if (move((maze2->get(loc->x + 1, loc->y)), end, temp_used))return true;
 			temp_used->reset();
 		}
 
 		if (!loc->top_used && !(before->bot_used) && (loc->y - 1) <= max_row) {
 			loc->top_used = true;
 			temp_used->top_used = true;;
-			if (move(&(maze2->get(loc->x, loc->y - 1)), end, temp_used))return true;
+			if (move((maze2->get(loc->x, loc->y - 1)), end, temp_used))return true;
+			temp_used->reset();
+		}
+
+		if (!loc->bot_used && !(before->top_used) && (loc->y + 1) <= max_row) {
+			loc->bot_used = true;
+			temp_used->bot_used = true;
+			if (move((maze2->get(loc->x, loc->y + 1)), end, temp_used))return true;
 			temp_used->reset();
 		}
 		return false;
 	}
 };
 
-class homobot2 :public roboter {
-	homobot2(vector<string> mace) {
-		auto robi = roboter();
-		robi.constructor(mace);
-	}
-	bool move(feld* loc, feld end, shared_ptr<used>before) {//location
+class homobot2 :public roboter {					//erbt vom roboter
+public:												
+	homobot2() :roboter() {};						//überladen durch gleichbennenung der function; parameter bleiben dieselben
+	bool move(shared_ptr<feld> loc, shared_ptr<feld> end, shared_ptr<used>before) {//location
+	
 		shared_ptr<used> temp_used = shared_ptr<used>(new used());
-		if ((loc->x == end.x && loc->y == end.y))return true;
+		if ((loc->x == end->x && loc->y == end->y)) {
+			++steps;
+			loc->used = true;
+			return true;
+		}
 		if (loc->hash_tag)return false;
 		++steps;
+		loc->used = true;
 		if (!loc->right_used && !(before->left_used) && (loc->x + 1) <= max_coll) {
 			loc->right_used = true;
 			temp_used->right_used = true;
-			if (move(&(maze2->get(loc->x + 1, loc->y)), end, temp_used))return true;
+			if (move((maze2->get(loc->x + 1, loc->y)), end, temp_used))return true;
 			temp_used->reset();
 		}
 
 		if (!loc->bot_used && !(before->top_used) && (loc->y + 1) <= max_row) {
 			loc->bot_used = true;
 			temp_used->bot_used = true;
-			if (move(&(maze2->get(loc->x, loc->y + 1)), end, temp_used))return true;
+			if (move((maze2->get(loc->x, loc->y + 1)), end, temp_used))return true;
 			temp_used->reset();
 		}
 
 		if (!loc->left_used && !(before->right_used) && (loc->x - 1) <= max_coll) {
 			loc->left_used = true;
 			temp_used->left_used = true;
-			if (move(&(maze2->get(loc->x - 1, loc->y)), end, temp_used))return true;
+			if (move((maze2->get(loc->x - 1, loc->y)), end, temp_used))return true;
 			temp_used->reset();
 		}
 
 		if (!loc->top_used && !(before->bot_used) && (loc->y - 1) <= max_row) {
 			loc->top_used = true;
 			temp_used->top_used = true;;
-			if (move(&(maze2->get(loc->x, loc->y - 1)), end, temp_used))return true;
+			if (move((maze2->get(loc->x, loc->y - 1)), end, temp_used))return true;
 			temp_used->reset();
 		}
 		return false;
@@ -219,18 +228,33 @@ class homobot2 :public roboter {
 
 int main()
 {
-	vector<string> maze;
+
+
+	homobot2 * tux2 = new homobot2();				//erstellen der objecte
+	roboter * robo2 = tux2;
+
+	homobot * tux = new homobot();
+	roboter * robo = tux;
+
+	vector<string> maze;						//init
 	string line;
-	ifstream myfile("../maze3_braid.txt");
+	ifstream myfile("../maze4_braid.txt");		//read file and speichern myfile
 	if (myfile.is_open()){
 		while (getline(myfile, line)){
 			maze.push_back(line);
 		}
 		myfile.close();
-		roboter robo1(maze);
 	}
-	else cout << "Unable to open file";
-	//print(maze);
+	else cout << "Unable to open file";			//file error
+	thread t1(&homobot::constructor, robo, maze);		//threads gleichzeitig 
+	thread t2(&homobot2::constructor, robo2, maze);
+	t1.join();                // pauses until first finishes	
+	t2.join();               // pauses until second finishes
+	robo->print();			// robo ruft maze print auf  und gibt steps aus print->printmaze
+	robo2->print();		
+	while (1);			//while(1) sonst beendet sich es programm zu schnell 
+	delete tux;			//delet objects
+	delete tux2;
 	return 0;
 }
 
