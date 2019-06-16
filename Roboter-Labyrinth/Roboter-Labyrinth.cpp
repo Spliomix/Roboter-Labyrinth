@@ -54,7 +54,7 @@ struct Maze {
 		for (size_t i = 0; i < input.size(); ++i) {
 			vector<shared_ptr<feld>> temp;
 			for (size_t j = 0; j < input.at(i).size();++j) {
-temp.push_back(shared_ptr<feld>(new feld(j, i, input.at(i).at(j) == '#' ? true : false)));
+			temp.push_back(shared_ptr<feld>(new feld(j, i, input.at(i).at(j) == '#' ? true : false)));
 			}
 			data.push_back(temp);
 		}
@@ -289,13 +289,8 @@ int main()
 	thread t2(&homobot2::constructor, robo2, maze);
 	t1.join();                // pauses until first finishes	
 	t2.join();               // pauses until second finishes
-
-
-
-
 	robo->print();			// robo ruft maze print auf  und gibt steps aus print->printmaze
 	robo2->print();		
-	while (1);			//while(1) sonst beendet sich es programm zu schnell 
 	delete tux;			//delet objects
 	delete tux2;
 	return 0;
